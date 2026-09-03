@@ -1,0 +1,32 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS
+.DS_Store
+
+# Project-specific exclusions
+frontend/
+knowledge/
+output/
+
+# Logs
+*.log
+
+# Local scratch / test files
+hello.py
+src/project_team/test-jira.py
+
+# Generated artifacts
+report.md

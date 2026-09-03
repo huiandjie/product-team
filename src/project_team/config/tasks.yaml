@@ -1,0 +1,480 @@
+planing_task:
+  description: >
+    Based on the user’s application idea {application}, produce a structured product definition suitable for engineering and business stakeholders.
+
+    Your responsibilities:
+    1) Define a clear product identity:
+      - A concise one-line product title.
+      - A two-sentence product pitch explaining the problem, target user, and value proposition.
+
+    2) Identify the target users:
+      - Exactly 3 personas.
+      - Each persona must include: name, short description, primary need, and motivation.
+
+    3) Define business objectives:
+      - Exactly 3 business goals.
+      - Each goal must include a measurable KPI that could realistically be tracked after launch.
+
+    4) Define high-level product requirements:
+      - Provide exactly 6 total requirements.
+      - Split them into:
+        - MVP: must-have capabilities required for initial launch.
+        - Future: enhancements that can be built after validation.
+      - Requirements must describe *what* the system does, not *how* it is implemented.
+
+    Assumptions & constraints:
+    - Make reasonable assumptions when details are missing.
+    - Avoid technical implementation details (no frameworks, databases, or APIs).
+    - Focus on user value, business impact, and functional scope.
+
+  expected_output: >
+    AJSON file with the the following format: Output format (MUST FOLLOW EXACTLY):
+    - Return a single valid JSON object.
+    - Use the following keys only:
+      {
+        "title": string,
+        "pitch": string,
+        "personas": [
+          { "name": string, "description": string, "primary_need": string, "motivation": string }
+        ],
+        "goals": [
+          { "goal": string, "kpi": string }
+        ],
+        "requirements": {
+          "mvp": [string],
+          "future": [string]
+        }
+        "jira_epic_key": string
+      }
+    - Do not include any text outside the JSON.
+    - Ensure the JSON is syntactically valid and complete.
+    A jira Epic created with the tool (Jira Epic Creator Tool)
+
+  agent: project_manager
+  context:
+  output_file: output/{application}/summary.json
+
+application_task:
+  description: >
+    Translate the product vision into structured, prioritized features.
+
+    Input:
+    - Product definition JSON produced by the Product Manager, including:
+      title, pitch, personas, goals, requirements, assumptions, jira_epic_key.
+
+    Your responsibilities:
+
+    1) Analyze the PM output:
+      - Use personas (primary_need and motivation) to infer user-facing capabilities.
+      - Use business goals and KPIs to guide feature prioritization.
+      - Review assumptions and highlight where they influence feature scope.
+
+    2) Define product features:
+      - Produce a list of product features that collectively satisfy all MVP requirements.
+      - Include future features only if explicitly justified by PM future requirements.
+      - Avoid technical or architectural implementation details.
+
+    3) For each feature, provide:
+      - id (short, stable identifier)
+      - name
+      - description (what the feature does from a user/business perspective)
+      - related_personas (array of persona names)
+      - priority (high | medium | low)
+      - acceptance_criteria (1–3 clear, testable statements)
+      - related_assumptions (array of assumption strings, if applicable)
+
+    Constraints:
+    - Every MVP requirement must be covered by at least one feature.
+    - Features must be written at a level suitable for conversion into user stories.
+    - Do not introduce new requirements beyond the PM’s scope.
+
+  expected_output: >
+    A list with up to {feature_count} modern features based on the research and alalysis about {application}
+    and jira Features created with the jira issue creator tool, passing in "Feature" as the type and the epic key created from planing task as the parent key.
+
+    Output format (MUST FOLLOW EXACTLY):
+    - Return a single valid JSON object with the following structure:
+
+    {
+      "features": [
+        {
+          "id": string,
+          "name": string,
+          "description": string,
+          "related_personas": [string],
+          "priority": "high" | "medium" | "low",
+          "acceptance_criteria": [string],
+          "related_assumptions": [string],
+          "jira_feature_key": string
+        }
+      ]
+    }
+
+    - Do not include any text outside the JSON.
+    - Ensure the JSON is syntactically valid.
+
+  agent: business_analyst
+  context: 
+    - planing_task 
+  output_file: output/{application}/features.json
+  
+
+feature_task:
+  description: >
+    Create a development-ready product backlog.
+
+    Input:
+    - Feature list JSON produced by the Business Analyst.
+
+    Your responsibilities:
+
+    1) Decompose features into user stories:
+      - Each feature must be represented by one or more user stories.
+      - User stories must be written from a clear user perspective.
+
+    2) For each user story, provide:
+      - id (unique, stable identifier)
+      - title (short, descriptive)
+      - description in the format:
+        "As a <user>, I want <capability>, so that <benefit>."
+      - acceptance_criteria (2–4 testable conditions)
+      - priority (high | medium | low)
+      - estimate (XS | S | M | L)
+      - related_feature_id
+      - dependencies (array of story ids, if any)
+
+    3) Backlog quality rules:
+      - Acceptance criteria must be precise enough for testing.
+      - Stories should be small enough to be implemented independently where possible.
+      - Dependencies must be explicitly stated when stories rely on other stories.
+
+    Constraints:
+    - Do not introduce new functionality beyond the feature definitions.
+    - Do not include technical or implementation details.
+    - Ensure all high-priority features are covered by high-priority stories.
+
+  expected_output: >
+    A fully stories to accomplish {application}.
+    jira Stories created under the epic created from planing task, and linked to the corresponding features 
+    with the jira story creator tool, passing in epic key and feature key created from application task.
+
+    Output format (MUST FOLLOW EXACTLY):
+    - Return a single valid JSON object with the following structure:
+
+    {
+      "user_stories": [
+        {
+          "id": string,
+          "title": string,
+          "description": string,
+          "acceptance_criteria": [string],
+          "priority": "high" | "medium" | "low",
+          "estimate": "XS" | "S" | "M" | "L",
+          "related_feature_id": string,
+          "dependencies": [string],
+          "feature_name": string,
+          "jira_story_key": string
+        }
+      ]
+    }
+
+    - Do not include any text outside the JSON.
+    - Ensure the JSON is syntactically valid.
+  agent: product_owner
+  context: 
+    - planing_task
+    - application_task
+  output_file: output/{application}/stories.json
+
+
+
+architecture_task:
+  description: >
+    Design the technical structure of the system.
+
+    Input:
+    - User story backlog JSON produced by the Product Owner.
+
+    Your responsibilities:
+
+    1) Derive system capabilities:
+      - Analyze user stories and acceptance criteria to identify required system behaviors.
+      - Group related behaviors into logical backend and frontend components.
+
+    2) Define the high-level architecture:
+      - Identify major components (e.g., API services, data stores, frontend app, external integrations).
+      - Describe each component’s responsibility and boundaries.
+      - Keep the design simple and appropriate for an MVP.
+
+    3) Define the data model:
+      - Identify core domain entities and their relationships.
+      - For each entity, list key fields and their purpose.
+
+    4) Define API contracts:
+      - List required API endpoints derived from user stories.
+      - For each endpoint include:
+        method, path, purpose, request summary, response summary.
+
+    5) Produce an architecture diagram:
+      - Provide a high-level system diagram using Mermaid syntax.
+      - Show component interactions and data flow.
+
+    Constraints:
+    - Prefer well-established architectural patterns and conventions.
+    - Avoid unnecessary complexity or over-engineering.
+    - Design must be implementable by a small team in a hackathon context.
+
+  expected_output: >
+    A fully fledged architectural design including all the technical components and integration.
+    Output format (MUST FOLLOW EXACTLY):
+    - Return a single valid JSON object with the following structure:
+
+    {
+      "architecture": {
+        "components": [
+          {
+            "name": string,
+            "type": "frontend" | "backend" | "database" | "external",
+            "description": string
+          }
+        ],
+        "data_model": {
+          "<EntityName>": [
+            { "field": string, "description": string }
+          ]
+        },
+        "api_endpoints": [
+          {
+            "method": string,
+            "path": string,
+            "purpose": string,
+            "request": string,
+            "response": string
+          }
+        ],
+        "diagram": string
+      }
+    }
+
+    - Do not include any text outside the JSON.
+    - Ensure the JSON is syntactically valid.
+
+  agent: solution_architect
+  context: 
+    - application_task
+    - feature_task
+  output_file: output/{application}/architecture.json
+
+code_task:
+  description: >
+    Given the solution architect’s output (components, API endpoints, and data model), scaffold a runnable Node.js backend using Express following Express API best practices.
+
+    Requirements:
+    1) Project structure
+    - Use a clear layered structure: src/app.js, src/server.js, src/routes/, src/controllers/, src/services/, src/models/, src/middlewares/, src/utils/, src/config/
+    - Include environment configuration using dotenv.
+    - Include centralized error handling middleware and a standard API response pattern.
+    - Include request validation using a common library (Joi or Zod). Validate inputs for every POST/PUT/PATCH endpoint.
+    - Include logging (morgan) and security middleware (helmet), and enable CORS.
+    - Include a health endpoint: GET /health returning { "status": "ok" }.
+
+    2) Data layer
+    - Implement the data model using Sequelize OR Prisma (choose one and be consistent).
+    - Provide initial schema/model definitions for the entities described by the architect.
+    - Provide a simple local development database option (SQLite is acceptable for hackathon). Include connection config.
+    - Include a seed script (optional but preferred) with sample data for at least Products.
+
+    3) API layer
+    - Implement all endpoints listed by the solution architect (at least stubs returning realistic mock data if full implementation is too large).
+    - Ensure consistent RESTful conventions, route naming, and HTTP status codes.
+    - Add basic pagination for list endpoints when applicable (e.g., GET /products?page=&limit=).
+
+    4) Developer experience
+    - Provide package.json with scripts: dev (nodemon), start, test (if tests are included), lint (optional).
+    - Provide README.md with setup/run instructions.
+    - Provide Dockerfile suitable for running the API.
+    - Provide .env.example showing required environment variables.
+
+    5) External integrations
+    - If the architecture includes external services (payments, email, shipping), implement them as service interfaces in src/services/ with mock providers returning deterministic dummy responses.
+
+    6) Iterate through the code_files and write the code to the file using the FileWriterTool
+    - The file path should be the path of the file
+    - The content should be the content of the file
+    - The root path should be output/{application}/backend
+
+  expected_output: >
+    - Return a single valid JSON object with exactly one top-level key: "code_files".
+
+      {
+        "code_files": [
+          { "path": "package.json", "content": "..." },
+          { "path": "src/server.js", "content": "..." }
+          ... (and other files as needed based on the backend components and features)
+        ]
+      }
+
+      - Do not include any text outside the JSON.
+      - Ensure the JSON is syntactically valid.
+      
+    - Backend code project structure like the following (listed here for reference/example only): by iterating through the code_files and write the code to the file using the FileWriterTool
+      - output/{application}/backend
+      - output/{application}/backend/src
+      - output/{application}/backend/src/app.js
+      - output/{application}/backend/src/routes
+      - output/{application}/backend/src/routes/index.js
+      - output/{application}/backend/src/routes/products.routes.js
+      - output/{application}/backend/src/controllers
+      - output/{application}/backend/src/controllers/products.controller.js
+      - output/{application}/backend/src/services/products.service.js
+      - output/{application}/backend/src/models/index.js (DB init)
+      - output/{application}/backend/src/models/product.model.js (and other models as needed)
+      - output/{application}/backend/src/middlewares/errorHandler.js
+      - output/{application}/backend/src/middlewares/validateRequest.js
+      - output/{application}/backend/src/config/config.js (or equivalent)
+      - output/{application}/backend/Dockerfile
+      - output/{application}/backend/README.md
+      - output/{application}/backend/.env.example
+      - ... (and other files as needed based on the backend components and features)
+ 
+  agent: backend_engineer
+  context:
+    - architecture_task
+  output_file: output/{application}/backend.json  
+
+
+frontend_task:
+  description: >
+    Implemente a runnable frontend application skeleton.
+
+    Input:
+    - Architecture JSON produced by the Solution Architect, including:
+      components, data_model, api_endpoints, and diagram.
+    - API endpoints include method, path, purpose, request, response, and related_features.
+
+    Your responsibilities:
+
+    1) Analyze frontend scope:
+      - Identify all frontend-relevant components from the architecture.
+      - Use related_features and API endpoints to infer required pages and user flows.
+      - Treat each feature group as a user-facing capability or screen group.
+
+    2) Scaffold the frontend application:
+      - Create a runnable frontend project using a modern framework (React preferred unless otherwise specified).
+      - Establish a clean, maintainable project structure (pages, components, services, hooks/utils).
+      - Include routing to represent major user flows derived from feature groups.
+
+    3) Implement API integration stubs:
+      - Create a centralized API client module.
+      - Define functions for each backend API endpoint listed in the architecture.
+      - Use mock or placeholder responses where backend functionality is not yet implemented.
+
+    4) Implement UI scaffolding:
+      - Create basic pages and components corresponding to feature groups.
+      - Focus on structure and data flow, not visual design or styling.
+      - Clearly demonstrate how frontend components interact with backend APIs.
+
+    5) Developer experience:
+      - Ensure the application runs locally.
+      - Provide basic setup and run instructions in README.md.
+
+    Constraints:
+    - Do not implement backend logic.
+    - Do not add new features beyond those defined in the architecture.
+    - Avoid complex styling or UI frameworks unless explicitly required.
+    - Prioritize clarity, structure, and alignment with backend APIs.
+
+  expected_output: >
+    - Return a single valid JSON object with exactly one top-level key: "code_files".
+
+        {
+          "code_files": [
+            { "path": "package.json", "content": "..." },
+            { "path": "src/app.js", "content": "..." }
+            ... (and other files as needed based on the frontend components and features)
+          ]
+        }
+
+      - Do not include any text outside the JSON.
+      - Ensure the JSON is syntactically valid.
+
+    - Frontend code project structure like the following (listed here for reference/example only): by iterating through the code_files and write the code to the file using the FileWriterTool
+      - output/{application}/frontend
+      - output/{application}/frontend/src
+      - output/{application}/frontend/src/app.js
+      - output/{application}/frontend/src/routes
+      - output/{application}/frontend/src/routes/index.js
+      - output/{application}/frontend/src/routes/products.routes.js
+      - output/{application}/frontend/src/controllers
+      - output/{application}/frontend/src/controllers/products.controller.js
+      - output/{application}/frontend/src/services
+      - output/{application}/frontend/src/services/products.service.js
+      - output/{application}/frontend/src/models
+      - output/{application}/frontend/src/models/index.js (DB init)
+      - output/{application}/frontend/src/models/product.model.js (and other models as needed)
+      - output/{application}/frontend/src/middlewares/errorHandler.js
+      - output/{application}/frontend/src/middlewares/validateRequest.js
+      - output/{application}/frontend/src/config/config.js (or equivalent)
+      - output/{application}/frontend/Dockerfile
+      - output/{application}/frontend/README.md
+      - output/{application}/frontend/.env.example
+      - ... (and other files as needed based on the frontend components and features)
+
+  agent: frontend_engineer
+  context:
+    - architecture_task
+  output_file: output/{application}/frontend.json
+
+test_task:
+  description: >
+    Write test files for validating backend functionality and API contracts.
+
+    Input:
+    - Architecture JSON produced by the Solution Architect, including: components, data_model, api_endpoints, and related_features.
+    - Backend code JSON produced by the Backend Engineer.
+
+    1) Analyze test scope:
+      - Use api_endpoints and related_features to identify required test coverage.
+      - Treat each feature group as a logical test suite boundary.
+      - Create automated tests for backend APIs using an appropriate test framework.
+      - Group tests by related_features.
+      - Clearly name test files and test cases to reflect feature intent.
+    4) Test execution and documentation:
+      - Ensure tests can be run locally against the backend service.      - Provide clear instructions for running tests.
+      - If backend services are not fully implemented, use mocks or stubs where necessary.
+
+    Constraints:
+    - Do not test frontend UI behavior.
+    - Do not introduce new functionality or assumptions beyond the architecture.
+    - Prefer clarity and reliability over exhaustive coverage.
+    - Tests should be deterministic and repeatable.
+
+  expected_output: >
+    - Return a single valid JSON object with exactly one top-level key: "code_files".
+
+        {
+          "code_files": [
+            { "path": "README.md", "content": "..." },
+            { "path": "src/test_components.js", "content": "..." }
+            ... (and other files as needed based on the test components and features)
+          ]
+        }
+
+      - Do not include any text outside the JSON.
+      - Ensure the JSON is syntactically valid.
+
+    - Test code project structure like the following (listed here for reference/example only): by iterating through the code_files and write the code to the file using the FileWriterTool
+      - output/{application}/test
+      - output/{application}/test/src
+      - output/{application}/test/src/test_components.py
+      - output/{application}/test/src/test_routes.py
+      - output/{application}/test/src/test_services.py
+      - output/{application}/test/src/test_models.py
+      - output/{application}/test/src/test_middlewares.py
+      - output/{application}/test/src/test_config.py
+      - ... (and other files as needed based on the test components and features)
+
+  agent: test_engineer
+  context:
+    - architecture_task
+  output_file: output/{application}/test.json
